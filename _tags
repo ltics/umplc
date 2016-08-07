@@ -1,0 +1,5 @@
+<src/**>: include
+<src/**>: package(core)
+<test/**>: include
+<test/**>: package(oUnit)
+true:thread
