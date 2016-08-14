@@ -1,0 +1,14 @@
+#use "topfind";;
+#thread;;
+#camlp4o;;
+#require "core.top";;
+#require "core.syntax";;
+open Core.Std
+
+
+#require "pa_ounit.syntax";;
+#mod_use "Syntax.ml";;
+#mod_use "_build/Parser.ml";;
+#mod_use "_build/Lexer.ml";;
+#mod_use "ParserHelpers.ml";;
+#use "Main.ml";;
