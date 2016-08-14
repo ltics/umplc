@@ -1,14 +1,15 @@
 open Syntax
 
-(* TODO: Add cases to value *)
-type value
+type value =
+  | VInt of int
+  | VBool of bool
+  | VClosure of id * exp * env
 
-(* TODO: Implement typecheck and any required helper functions. *)
+and env = (id * value) list
+
 let typecheck (e : exp) : typ = failwith "not implemented"
 
-(* TODO: Implement eval and any required helper functions. *)
 let eval (e : exp) : value = failwith "not implemented"
-
 
 (******************************************************************************)
 (* The following test cases are part of the assignment document. *)
