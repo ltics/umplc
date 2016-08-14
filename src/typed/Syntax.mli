@@ -1,5 +1,3 @@
-(* You can add constructors to these types, but don't change the existing
-   cases. *)
 type id = string
 
 type typ =
@@ -7,7 +5,6 @@ type typ =
   | TBool
   | TFun of typ * typ
   | TList of typ
-
 
 type op2 =
   | LT

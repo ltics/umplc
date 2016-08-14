@@ -34,8 +34,6 @@ module HOAS = struct
     | VInt of int
     | VClosure of (value -> exp)
 
-  and env = (id * value) list
-
   let rec eval (exp : exp) : value = match exp with
     | Id v -> v
     | Int n -> VInt n
