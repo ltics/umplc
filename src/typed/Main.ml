@@ -7,9 +7,52 @@ type value =
   | VClosure of id * exp * env
 
 and env = (id * value) list
+and gamma = (id * typ) list
 
-let typecheck (e : exp) : typ = failwith "not implemented"
+let check_binary (op : op2) (t1 : typ) (t2 : typ) : typ = match (op, t1, t2) with
+  | LT, TBool, TBool -> TBool
+  | GT, TBool, TBool -> TBool
+  | Eq, t1, t2 when t1 = t2 -> TBool
+  | Add, TInt, TInt -> TInt
+  | Sub, TInt, TInt -> TInt
+  | Mul, TInt, TInt -> TInt
+  | _ -> failwith "type mismatch"
 
+let rec typecheck (e : exp) (env : gamma) : typ = match e with
+  | Id x -> List.assoc x env
+  | Const (Int _) -> TInt
+  | Const (Bool _) -> TBool
+  | Op2 (op, e1, e2) -> check_binary op (typecheck e1 env) (typecheck e2 env)
+  | If (p, c, a) -> (match typecheck p env with
+      | TBool -> (match (typecheck c env, typecheck a env) with
+          | ct, at when ct = at -> ct
+          | _ -> failwith "type of branches mismatch")
+      | _ -> failwith "expected bool type")
+  | Let (x, v, b) -> typecheck b ((x, typecheck v env) :: env)
+  | Fun (x, t, b) -> TFun (t, typecheck b ((x, t) :: env))
+  | App (e1, e2) -> (match typecheck e1 env with
+      | TFun (a, b) -> (match typecheck e2 env with
+          | a' when a = a' -> b
+          | _ -> failwith "argument type mismatch")
+      | _ -> failwith "expected function type")
+  | Fix (x, t, b) -> (match (t, typecheck b ((x, t) :: env)) with
+      | TFun _, t' when t = t' -> t
+      | _ -> failwith "typecheck fixpoint failed")
+  | Empty t -> TList t
+  | Cons (h, t) -> (match (typecheck h env, typecheck t env) with
+      | th, (TList tl as t) when th = tl -> t
+      | _ -> failwith "list type mismatch")
+  | Head l -> (match typecheck l env with
+      | TList t -> t
+      | _ -> failwith "expected list type")
+  | Tail l -> (match typecheck l env with
+      | TList _ as t -> t
+      | _ -> failwith "expected list type")
+  | IsEmpty l -> (match typecheck l env with
+      | TList _ -> TBool
+      | _ -> failwith "expected list type")
+
+(* ************************ deprecated **************************** *)
 let binary_eval (op: op2) (v1: value) (v2: value) : value = match (op, v1, v2) with
   | LT, VInt a, VInt b -> VBool (a < b)
   | GT, VInt a, VInt b -> VBool (a > b)
@@ -19,6 +62,27 @@ let binary_eval (op: op2) (v1: value) (v2: value) : value = match (op, v1, v2) w
   | Sub, VInt a, VInt b -> VInt (a - b)
   | Mul, VInt a, VInt b -> VInt (a * b)
   | _ -> failwith "invalid binary_eval operation"
+
+let rec eval_env (env : env) (e : exp) : value = match e with
+  | Id x -> List.assoc x env
+  | Const c -> (match c with
+    | Int i -> VInt i
+    | Bool b -> VBool b)
+  | Op2 (op, e1, e2) -> binary_eval op (eval_env env e1) (eval_env env e2)
+  | If (p, c, a) -> (match (eval_env env p) with
+      | VBool b -> (match b with
+        | true -> eval_env env c
+        | false -> eval_env env a)
+      | _ -> failwith "need bool value")
+  | Let (x, v, b) -> eval_env ((x, eval_env env v) :: env) b
+  | Fun (x, t, b) -> VClosure (x, b, env)
+  | App (fn, arg) -> let v = eval_env env arg in
+    (match (eval_env env fn) with
+     | VClosure (x, b, env') -> eval_env ((x, v) :: env') b
+     | _ -> failwith "need closure value")
+  (* | Fix (x, t, b) -> eval_env ((x, Fix (x, t, b)) :: env) b *)
+  | _ -> failwith "unsupported"
+(* ************************ deprecated **************************** *)
 
 let binary_subst (op: op2) (v1: exp) (v2: exp) : exp = match (op, v1, v2) with
   | LT, Const (Int a), Const (Int b) -> Const (Bool (a < b))
@@ -45,26 +109,6 @@ let rec subst (x : id) (v : exp) (e : exp) : exp = match e with
   | Tail l -> Tail (subst x v l)
   | IsEmpty l -> IsEmpty (subst x v l)
 
-let rec eval_env (env : env) (e : exp) : value = match e with
-  | Id x -> List.assoc x env
-  | Const c -> (match c with
-    | Int i -> VInt i
-    | Bool b -> VBool b)
-  | Op2 (op, e1, e2) -> binary_eval op (eval_env env e1) (eval_env env e2)
-  | If (p, c, a) -> (match (eval_env env p) with
-      | VBool b -> (match b with
-        | true -> eval_env env c
-        | false -> eval_env env a)
-      | _ -> failwith "need bool value")
-  | Let (x, v, b) -> eval_env ((x, eval_env env v) :: env) b
-  | Fun (x, t, b) -> VClosure (x, b, env)
-  | App (fn, arg) -> let v = eval_env env arg in
-    (match (eval_env env fn) with
-     | VClosure (x, b, env') -> eval_env ((x, v) :: env') b
-     | _ -> failwith "need closure value")
-  (* | Fix (x, t, b) -> eval_env ((x, Fix (x, t, b)) :: env) b *)
-  | _ -> failwith "unsupported"
-
 let to_bool (e : exp) : bool = match e with
   | Const (Bool b) -> b
   | _ -> failwith "expected Bool"
@@ -79,6 +123,7 @@ let rec eval_subst (e : exp) : exp = match e with
   | App (e1, e2) -> (match (eval_subst e1, eval_subst e2) with
       | Fun (x, _, b), v -> subst x v b
       | _ -> failwith "expected function")
+  (* translate the semantic rule directly *)
   | Fix (x, t, b) -> subst x e b
   | Empty _ -> e
   | Cons (e1, e2) -> Cons (eval_subst e1, eval_subst e2)
