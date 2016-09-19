@@ -16,7 +16,7 @@ desuger to
 (λx:T. t2) (fix (λx:T. t1))
 ```
 
-if t1 and t2 represent the same term
+and through the definition of Fix-point that `F f = f (F f)`, we can easily infer
 
 ```
 fix (λx:T. e) = (λx:T. e) (fix (λx:T. e))
